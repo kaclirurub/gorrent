@@ -1,79 +1,19 @@
 package main
 
 import (
+	//"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
+	"math/rand"
+	"net"
 	"os"
-	"reflect"
+	"time"
 
 	"github.com/missingsix/bencode"
+	"github.com/missingsix/torrent"
 )
-
-type torrent struct {
-	announce string
-	info     info
-}
-
-type info struct {
-	files       []file
-	name        string
-	pieceLength int64
-	pieces      string // SHA1 hash of piece (20 bytes long)
-}
-
-type file struct {
-	length int64
-	path   []string
-}
-
-// TODO : Probably easier to parse the whole thing then create the torrent struct...
-func loadTorrent(dict map[string]interface{}) (torrent, error) {
-	announce := dict["announce"].(string)
-
-	decodedInfo := dict["info"].(map[string]interface{})
-	//	fmt.Println(info)
-	tempFiles := reflect.ValueOf(decodedInfo["files"].(interface{}))
-	//	s := reflect.ValueOf(files)
-
-	// TODO: Append files to the torrent.file struct
-	// TODO: Need to get lengths from files as well
-	files := make([]file, tempFiles.Len())
-	for i := 0; i < tempFiles.Len(); i++ {
-		length := tempFiles.Index(i).Interface().(map[string]interface{})["length"].(int64)
-		fmt.Println("length->", length)
-		tempPath := tempFiles.Index(i).Interface().(map[string]interface{})["path"].([]interface{})
-
-		paths := make([]string, len(tempPath))
-		for p := range tempPath {
-			paths[p] = tempPath[p].(string)
-		}
-
-		for _, pathName := range paths {
-			fmt.Println("pathName->", pathName)
-		}
-
-		file := file{length, paths}
-		fmt.Println("file->", file)
-		files[i] = file
-	}
-
-	fmt.Println("files->", files)
-
-	name := decodedInfo["name"].(string)
-	fmt.Println(name)
-	//	fmt.Println("pieceLength->", reflect.TypeOf(info["piece length"]))
-	pieceLength := decodedInfo["piece length"].(int64)
-	fmt.Println(pieceLength)
-	//torrent.info.files = files.(map[int]string)
-
-	pieces := decodedInfo["pieces"].(string)
-
-	torrent := torrent{announce, info{files, name, pieceLength, pieces}}
-
-	fmt.Println("torrent->", torrent)
-
-	return torrent, nil
-}
 
 func main() {
 	//file, err := os.Open(os.Args[1])
@@ -88,16 +28,61 @@ func main() {
 		log.Fatal(err)
 	}
 
-	torrent, err := loadTorrent(dict)
+	torrent, err := torrent.LoadTorrent(dict)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("\n" + torrent.announce)
+	fmt.Println("torrent->", torrent)
 
-	/*for key, value := range dict {
-		fmt.Printf(key+"->%v\n", value)
-	}*/
-	//fmt.Printf("string: %s\n", dict["string key"].(string))
-	//fmt.Printf("string: %s\n", dict["int key"].(int64))
+	fmt.Println(torrent.GetConnectionString())
+	ServerAddr, err := net.ResolveUDPAddr("udp", "open.demonii.com:1337")
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("Resolved!->", ServerAddr)
+	}
+
+	conn, err := net.DialUDP("udp", nil, ServerAddr)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	rand.Seed(time.Now().UnixNano())
+
+	var connection_id int64 = 0x41727101980
+	var action int32 = 0x0
+	var transaction_id int32 = rand.Int31n(255)
+
+	fmt.Println(connection_id)
+	fmt.Println(action)
+	fmt.Println(transaction_id)
+
+	connectionRequest := new(bytes.Buffer)
+	binary.Write(connectionRequest, binary.BigEndian, connection_id)
+	binary.Write(connectionRequest, binary.BigEndian, action)
+	binary.Write(connectionRequest, binary.BigEndian, transaction_id)
+
+	fmt.Println("connectionRequest->", connectionRequest.Bytes())
+	conn.Write(connectionRequest.Bytes())
+	//	fmt.Fprintf(conn, buf.Bytes())
+
+	connectResponse := make([]byte, 16)
+	//status, err := bufio.NewReader(conn).Read(p)
+	status, _, err := conn.ReadFromUDP(connectResponse)
+
+	fmt.Println("status->", status)
+	fmt.Println("connectResponse->", connectResponse)
+
+	connection_id = 0x41727101980
+	action = 0x1
+
+	announceRequest := new(bytes.Buffer)
+
+	binary.Write(announceRequest, binary.BigEndian, connectResponse[8:])
+	binary.Write(announceRequest, binary.BigEndian, action)
+	binary.Write(announceRequest, binary.BigEndian, transaction_id)
+
+	fmt.Println("announceRequest->", announceRequest.Bytes())
+
 }
