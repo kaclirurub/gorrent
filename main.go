@@ -74,7 +74,6 @@ func main() {
 	fmt.Println("status->", status)
 	fmt.Println("connectResponse->", connectResponse)
 
-	connection_id = 0x41727101980
 	action = 0x1
 
 	announceRequest := new(bytes.Buffer)
