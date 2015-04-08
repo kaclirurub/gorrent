@@ -1,4 +1,4 @@
-package main
+package gorrent
 
 import (
 	//"bufio"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/missingsix/bencode"
-	"github.com/missingsix/torrent"
 )
 
 func main() {
@@ -28,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	torrent, err := torrent.LoadTorrent(dict)
+	torrent, err := LoadTorrent(dict)
 	if err != nil {
 		log.Fatal(err)
 	}
